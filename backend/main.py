@@ -19,6 +19,10 @@ app.add_middleware(
 # Initialize the engagement tracker
 tracker = EngagementTracker()
 
+@app.get("/")
+async def root():
+    return {"message": "Welcome to the Engagement Tracker API!", "status": "online"}
+
 @app.post("/analyze")
 async def analyze_image(file: UploadFile = File(...)):
     # Read image
@@ -36,6 +40,10 @@ async def analyze_image(file: UploadFile = File(...)):
         "looking_direction": analysis['looking_direction'],
         "engagement": analysis['engagement']
     }
+
+@app.get("/health")
+async def health_check():
+    return {"status": "healthy"}
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 8000))  # Use PORT from environment variable
