@@ -1,242 +1,415 @@
-'use client';
-import React, { useState, useEffect } from "react";
-import { X, ArrowRight, ArrowLeft } from "lucide-react";
-import { motion } from "framer-motion";
-import { 
-  PieChart, 
-  Pie, 
-  Cell, 
-  Tooltip, 
-  ResponsiveContainer, 
-  BarChart, 
-  Bar, 
-  XAxis, 
-  YAxis, 
-  LineChart, 
-  Line 
-} from "recharts";
+import React, { useState, useMemo } from 'react';
+
+// 1) Import Chart.js + react-chartjs-2
+import {
+  Chart as ChartJS,
+  CategoryScale,
+  LinearScale,
+  BarElement,
+  Title,
+  Tooltip,
+  Legend,
+  ArcElement,
+  PointElement,
+  LineElement,
+} from 'chart.js';
+import { Bar, Pie, Line } from 'react-chartjs-2';
+
+// Register Chart.js components
+ChartJS.register(
+  CategoryScale,
+  LinearScale,
+  BarElement,
+  Title,
+  Tooltip,
+  Legend,
+  ArcElement,
+  PointElement,
+  LineElement
+);
+
+type StatEntry = {
+  timestamp: string;
+  emotion: string;
+  eye_state: string;
+  looking_direction: string;
+  engagement: string;
+  participant: string;
+};
 
 type LiveStatsProps = {
-  emotionData: {
-    timestamp: string;
-    emotion: string;
-    participant: string;
-    eye_tracking?: number;
-    engagement?: string;       // New field for engagement status
-    eye_state?: string;
-    looking_direction?: string;
-  }[];
+  emotionData: StatEntry[];
   onClose: () => void;
 };
 
-const EMOTION_COLORS: Record<string, string> = {
-  Happy: "#FFD700",
-  Sad: "#1E90FF",
-  Angry: "#FF4500",
-  Neutral: "#A9A9A9",
-  Surprised: "#8A2BE2",
-  Focused: "#4CAF50",
-  "Not Focused": "#F44336",
-};
+enum FocusScore {
+  'Not Focused' = 0,
+  Neutral = 1,
+  Focused = 2,
+}
 
-// Returns pie chart data for engagement distribution
-const getEngagementPieData = (data: LiveStatsProps["emotionData"]) => {
-  const counts = data.reduce((acc, { engagement }) => {
-    if (engagement) {
-      acc[engagement] = (acc[engagement] || 0) + 1;
-    }
-    return acc;
-  }, {} as Record<string, number>);
-  return Object.entries(counts).map(([name, value]) => ({ name, value }));
-};
-
-// Count emotions for Pie Chart
-const getPieData = (emotionData: LiveStatsProps["emotionData"]) => {
-  const counts = emotionData.reduce((acc, { emotion }) => {
-    acc[emotion] = (acc[emotion] || 0) + 1;
-    return acc;
-  }, {} as Record<string, number>);
-  return Object.entries(counts).map(([name, value]) => ({ name, value }));
-};
-
-// Emotion Trends Over Time
-const getTimeData = (emotionData: LiveStatsProps["emotionData"]) =>
-  emotionData.map(({ timestamp, emotion }) => ({
-    timestamp: new Date(timestamp).toLocaleTimeString(),
-    emotion,
-  }));
-
-// Eye Tracking Data
-const getEyeTrackingData = (emotionData: LiveStatsProps["emotionData"]) =>
-  emotionData.map(({ timestamp, eye_tracking = 0 }) => ({
-    timestamp: new Date(timestamp).toLocaleTimeString(),
-    value: eye_tracking,
-  }));
-
-// Emotion by Participant for Bar Chart
-const getBarData = (emotionData: LiveStatsProps["emotionData"]) => {
-  const participantData = emotionData.reduce((acc, { participant, emotion }) => {
-    if (!acc[participant]) {
-      acc[participant] = {
-        participant,
-        ...Object.fromEntries(Object.keys(EMOTION_COLORS).map(e => [e, 0])),
-      };
-    }
-    acc[participant][emotion] = (acc[participant][emotion] || 0) + 1;
-    return acc;
-  }, {} as Record<string, any>);
-  return Object.values(participantData);
-};
+/**
+ * Converts an engagement string (e.g., "Focused", "Not Focused", "Neutral")
+ * into a numeric value for line-chart plotting.
+ */
+function engagementToNumeric(engagement: string): number {
+  if (engagement === 'Focused') return FocusScore.Focused;
+  if (engagement === 'Neutral') return FocusScore.Neutral;
+  return FocusScore['Not Focused'];
+}
 
 const LiveStats: React.FC<LiveStatsProps> = ({ emotionData, onClose }) => {
-  const [currentGraph, setCurrentGraph] = useState(0);
+  const [activeTab, setActiveTab] = useState<'table' | 'emotionDist' | 'engagementDist' | 'engagementOverTime'>('table');
 
-  useEffect(() => {
-    document.body.style.overflow = "hidden";
-    return () => {
-      document.body.style.overflow = "auto";
-    };
-  }, []);
+  /** ====================== Data Transformations ====================== **/
 
-  const graphs = [
-    {
-      title: "📊 Engagement Distribution",
-      component: (
-        <ResponsiveContainer width="100%" height={250}>
-          <PieChart>
-            <Pie
-              data={getEngagementPieData(emotionData)}
-              dataKey="value"
-              nameKey="name"
-              cx="50%"
-              cy="50%"
-              outerRadius={80}
-              label
-            >
-              {getEngagementPieData(emotionData).map((entry, index) => (
-                <Cell key={index} fill={EMOTION_COLORS[entry.name] || "#8884d8"} />
-              ))}
-            </Pie>
-            <Tooltip
-              contentStyle={{ backgroundColor: "#fff", color: "#222", borderRadius: "8px" }}
-            />
-          </PieChart>
-        </ResponsiveContainer>
-      ),
-    },
-    {
-      title: "📊 Emotion Distribution",
-      component: (
-        <ResponsiveContainer width="100%" height={250}>
-          <PieChart>
-            <Pie
-              data={getPieData(emotionData)}
-              dataKey="value"
-              nameKey="name"
-              cx="50%"
-              cy="50%"
-              outerRadius={80}
-              label
-            >
-              {getPieData(emotionData).map((entry, index) => (
-                <Cell key={index} fill={EMOTION_COLORS[entry.name] || "#8884d8"} />
-              ))}
-            </Pie>
-            <Tooltip
-              contentStyle={{ backgroundColor: "#fff", color: "#222", borderRadius: "8px" }}
-            />
-          </PieChart>
-        </ResponsiveContainer>
-      ),
-    },
-    {
-      title: "📈 Emotion Trends Over Time",
-      component: (
-        <ResponsiveContainer width="100%" height={250}>
-          <LineChart data={getTimeData(emotionData)}>
-            <XAxis dataKey="timestamp" tick={{ fill: "#6A1B9A" }} />
-            <YAxis dataKey="emotion" type="category" tick={{ fill: "#6A1B9A" }} />
-            <Tooltip
-              contentStyle={{ backgroundColor: "#fff", color: "#222", borderRadius: "8px" }}
-            />
-            <Line type="monotone" dataKey="emotion" stroke="#FFD700" strokeWidth={2} />
-          </LineChart>
-        </ResponsiveContainer>
-      ),
-    },
-    {
-      title: "👀 Eye Tracking Over Time",
-      component: (
-        <ResponsiveContainer width="100%" height={250}>
-          <LineChart data={getEyeTrackingData(emotionData)}>
-            <XAxis dataKey="timestamp" tick={{ fill: "#6A1B9A" }} />
-            <YAxis tick={{ fill: "#6A1B9A" }} />
-            <Tooltip
-              contentStyle={{ backgroundColor: "#fff", color: "#222", borderRadius: "8px" }}
-            />
-            <Line type="monotone" dataKey="value" stroke="#00FFFF" strokeWidth={2} />
-          </LineChart>
-        </ResponsiveContainer>
-      ),
-    },
-    {
-      title: "👥 Emotion by Participant",
-      component: (
-        <ResponsiveContainer width="100%" height={250}>
-          <BarChart data={getBarData(emotionData)}>
-            <XAxis dataKey="participant" tick={{ fill: "#6A1B9A" }} />
-            <YAxis tick={{ fill: "#6A1B9A" }} />
-            <Tooltip
-              contentStyle={{ backgroundColor: "#fff", color: "#222", borderRadius: "8px" }}
-            />
-            {Object.keys(EMOTION_COLORS).map((emotion) => (
-              <Bar key={emotion} dataKey={emotion} stackId="a" fill={EMOTION_COLORS[emotion]} />
-            ))}
-          </BarChart>
-        </ResponsiveContainer>
-      ),
-    },
-  ];
+  // Frequency count of each emotion (for the bar chart)
+  const emotionCounts = useMemo(() => {
+    const counts: Record<string, number> = {};
+    for (const entry of emotionData) {
+      counts[entry.emotion] = (counts[entry.emotion] || 0) + 1;
+    }
+    return counts;
+  }, [emotionData]);
+
+  // Frequency count of each engagement (for the pie chart)
+  const engagementCounts = useMemo(() => {
+    const counts: Record<string, number> = {};
+    for (const entry of emotionData) {
+      counts[entry.engagement] = (counts[entry.engagement] || 0) + 1;
+    }
+    return counts;
+  }, [emotionData]);
+
+  // Engagement Over Time (line chart)
+  // Sort entries by timestamp, then create arrays of x-values (index or time) and y-values (FocusScore).
+  const sortedEntries = useMemo(() => {
+    return [...emotionData].sort((a, b) => {
+      return new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime();
+    });
+  }, [emotionData]);
+
+  // For each entry in chronological order, we plot engagement as a numeric value.
+  const lineChartLabels = sortedEntries.map((_, i) => `Data #${i + 1}`);
+  const lineChartDataValues = sortedEntries.map((entry) => engagementToNumeric(entry.engagement));
+
+  /** ====================== Chart Configs ====================== **/
+
+  // Emotion distribution (Bar chart)
+  const emotionDistData = {
+    labels: Object.keys(emotionCounts),
+    datasets: [
+      {
+        label: 'Emotion Count',
+        data: Object.values(emotionCounts),
+      },
+    ],
+  };
+
+  // Engagement distribution (Pie chart)
+  const engagementDistData = {
+    labels: Object.keys(engagementCounts),
+    datasets: [
+      {
+        label: 'Engagement Count',
+        data: Object.values(engagementCounts),
+      },
+    ],
+  };
+
+  // Engagement over time (Line chart)
+  const engagementLineData = {
+    labels: lineChartLabels,
+    datasets: [
+      {
+        label: 'Engagement (Focused=2, Neutral=1, Not Focused=0)',
+        data: lineChartDataValues,
+      },
+    ],
+  };
+
+  /** ====================== Download Handlers ====================== **/
+
+  // Download data as CSV
+  const handleDownloadCSV = () => {
+    // Create CSV header
+    const headers = ['timestamp', 'participant', 'emotion', 'eye_state', 'looking_direction', 'engagement'];
+    const csvRows = [headers.join(',')];
+
+    // Populate rows
+    for (const entry of emotionData) {
+      const row = [
+        new Date(entry.timestamp).toISOString(),
+        entry.participant,
+        entry.emotion,
+        entry.eye_state,
+        entry.looking_direction,
+        entry.engagement,
+      ];
+      csvRows.push(row.join(','));
+    }
+
+    const csvString = csvRows.join('\n');
+    const blob = new Blob([csvString], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = 'engagement_stats.csv';
+    link.click();
+
+    URL.revokeObjectURL(url);
+  };
+
+  // Download data as JSON
+  const handleDownloadJSON = () => {
+    const jsonString = JSON.stringify(emotionData, null, 2);
+    const blob = new Blob([jsonString], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = 'engagement_stats.json';
+    link.click();
+
+    URL.revokeObjectURL(url);
+  };
 
   return (
-    <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-60 backdrop-blur-md">
-      <motion.div
-        initial={{ opacity: 0, scale: 0.9 }}
-        animate={{ opacity: 1, scale: 1 }}
-        exit={{ opacity: 0, scale: 0.9 }}
-        className="w-[600px] max-w-full rounded-xl bg-gradient-to-br from-[#f4e1ff] to-[#fff6b0] p-6 shadow-2xl"
+    <div
+    style={{
+      position: 'fixed',
+      top: 0,
+      left: 0,
+      width: '100vw',
+      height: '100vh',
+      backgroundColor: 'rgba(0, 0, 0, 0.5)',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      zIndex: 1000,
+      color: '#000', // <--- Force text color black
+    }}
+  >
+      <div
+        style={{
+          backgroundColor: '#fff',
+          padding: '20px',
+          borderRadius: '8px',
+          maxHeight: '80vh',
+          overflowY: 'auto',
+          width: '90%',
+          maxWidth: '900px',
+          position: 'relative',
+        }}
       >
-        <div className="mb-4 flex items-center justify-between">
-          <h2 className="text-xl font-semibold text-[#5a189a]">
-            {graphs[currentGraph].title}
-          </h2>
-          <button onClick={onClose} className="text-gray-600 hover:text-[#5a189a]">
-            <X size={24} />
+        <h2>Live Engagement Stats</h2>
+        <button
+          onClick={onClose}
+          style={{
+            position: 'absolute',
+            top: '10px',
+            right: '10px',
+            backgroundColor: 'transparent',
+            border: 'none',
+            fontSize: '24px',
+            cursor: 'pointer',
+          }}
+        >
+          &times;
+        </button>
+
+        {/* ---- Navigation Tabs ---- */}
+        <div style={{ marginTop: '20px', display: 'flex', gap: '10px' }}>
+          <button
+            style={{ padding: '6px 12px', cursor: 'pointer' }}
+            onClick={() => setActiveTab('table')}
+          >
+            Table
+          </button>
+          <button
+            style={{ padding: '6px 12px', cursor: 'pointer' }}
+            onClick={() => setActiveTab('emotionDist')}
+          >
+            Emotion Dist
+          </button>
+          <button
+            style={{ padding: '6px 12px', cursor: 'pointer' }}
+            onClick={() => setActiveTab('engagementDist')}
+          >
+            Engagement Dist
+          </button>
+          <button
+            style={{ padding: '6px 12px', cursor: 'pointer' }}
+            onClick={() => setActiveTab('engagementOverTime')}
+          >
+            Engagement Over Time
           </button>
         </div>
 
-        <div className="mb-6">{graphs[currentGraph].component}</div>
-
-        <div className="flex justify-between">
+        {/* ---- Download Buttons ---- */}
+        <div style={{ marginTop: '10px' }}>
           <button
-            className="text-white bg-[#5a189a] px-4 py-2 rounded-lg hover:bg-[#6b21a8] disabled:opacity-50 flex items-center gap-2"
-            onClick={() => setCurrentGraph((prev) => Math.max(0, prev - 1))}
-            disabled={currentGraph === 0}
+            onClick={handleDownloadCSV}
+            style={{
+              padding: '6px 12px',
+              marginRight: '10px',
+              cursor: 'pointer',
+              backgroundColor: '#ffd700',
+              border: 'none',
+              borderRadius: '4px',
+            }}
           >
-            <ArrowLeft size={20} /> Prev
+            Download CSV
           </button>
           <button
-            className="text-black bg-[#ffdd57] px-4 py-2 rounded-lg hover:bg-[#fcca46] disabled:opacity-50 flex items-center gap-2"
-            onClick={() =>
-              setCurrentGraph((prev) => Math.min(graphs.length - 1, prev + 1))
-            }
-            disabled={currentGraph === graphs.length - 1}
+            onClick={handleDownloadJSON}
+            style={{
+              padding: '6px 12px',
+              cursor: 'pointer',
+              backgroundColor: '#a8e86c',
+              border: 'none',
+              borderRadius: '4px',
+            }}
           >
-            Next <ArrowRight size={20} />
+            Download JSON
           </button>
         </div>
-      </motion.div>
+
+        {/* ---- Tab Content ---- */}
+        <div style={{ marginTop: '20px' }}>
+          {activeTab === 'table' && (
+            <TableView emotionData={emotionData} />
+          )}
+
+          {activeTab === 'emotionDist' && (
+            <div style={{ width: '100%', maxWidth: '600px', margin: '0 auto' }}>
+              <h3>Emotion Distribution</h3>
+              <Bar
+                data={emotionDistData}
+                options={{
+                  responsive: true,
+                  plugins: {
+                    title: {
+                      display: true,
+                      text: 'Emotion Frequency',
+                    },
+                    legend: {
+                      display: false,
+                    },
+                  },
+                }}
+              />
+            </div>
+          )}
+
+          {activeTab === 'engagementDist' && (
+            <div style={{ width: '100%', maxWidth: '500px', margin: '0 auto' }}>
+              <h3>Engagement Distribution</h3>
+              <Pie
+                data={engagementDistData}
+                options={{
+                  responsive: true,
+                  plugins: {
+                    title: {
+                      display: true,
+                      text: 'Engagement Frequency',
+                    },
+                  },
+                }}
+              />
+            </div>
+          )}
+
+          {activeTab === 'engagementOverTime' && (
+            <div style={{ width: '100%', maxWidth: '600px', margin: '0 auto' }}>
+              <h3>Engagement Over Time</h3>
+              <Line
+                data={engagementLineData}
+                options={{
+                  responsive: true,
+                  scales: {
+                    y: {
+                      min: 0,
+                      max: 2,
+                      ticks: {
+                        callback: (value) => {
+                          // Convert numeric scale back to text
+                          switch (value) {
+                            case 0:
+                              return 'Not Focused';
+                            case 1:
+                              return 'Neutral';
+                            case 2:
+                              return 'Focused';
+                            default:
+                              return value;
+                          }
+                        },
+                      },
+                    },
+                  },
+                  plugins: {
+                    title: {
+                      display: true,
+                      text: 'Engagement Over Time (Focused=2, Neutral=1, Not Focused=0)',
+                    },
+                  },
+                }}
+              />
+            </div>
+          )}
+        </div>
+      </div>
     </div>
+  );
+};
+
+/** Simple table view for 'table' tab */
+const TableView: React.FC<{ emotionData: StatEntry[] }> = ({ emotionData }) => {
+  return (
+    <table
+      style={{
+        width: '100%',
+        borderCollapse: 'collapse',
+        marginTop: '20px',
+      }}
+    >
+      <thead>
+        <tr>
+          <th style={{ border: '1px solid #ddd', padding: '8px' }}>Timestamp</th>
+          <th style={{ border: '1px solid #ddd', padding: '8px' }}>Participant</th>
+          <th style={{ border: '1px solid #ddd', padding: '8px' }}>Emotion</th>
+          <th style={{ border: '1px solid #ddd', padding: '8px' }}>Eye State</th>
+          <th style={{ border: '1px solid #ddd', padding: '8px' }}>Direction</th>
+          <th style={{ border: '1px solid #ddd', padding: '8px' }}>Engagement</th>
+        </tr>
+      </thead>
+      <tbody>
+        {emotionData.map((data, index) => (
+          <tr key={index}>
+            <td style={{ border: '1px solid #ddd', padding: '8px' }}>
+              {new Date(data.timestamp).toLocaleTimeString()}
+            </td>
+            <td style={{ border: '1px solid #ddd', padding: '8px' }}>
+              {data.participant}
+            </td>
+            <td style={{ border: '1px solid #ddd', padding: '8px' }}>
+              {data.emotion}
+            </td>
+            <td style={{ border: '1px solid #ddd', padding: '8px' }}>
+              {data.eye_state}
+            </td>
+            <td style={{ border: '1px solid #ddd', padding: '8px' }}>
+              {data.looking_direction}
+            </td>
+            <td style={{ border: '1px solid #ddd', padding: '8px' }}>
+              {data.engagement}
+            </td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
   );
 };
 

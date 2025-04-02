@@ -22,7 +22,6 @@ import {
 import Loader from './Loader';
 import EndCallButton from './EndCallButton';
 import LiveStats from './LiveStats';
-import { useMeetingAdmin } from '../hooks/useMeetingAdmin';
 import { useParams } from 'next/navigation';
 
 type CallLayoutType = 'grid' | 'speaker-left' | 'speaker-right';
@@ -33,23 +32,18 @@ const MeetingRoom = () => {
   const { id: callId } = useParams();
   console.log('🛠️ callId before passing to hook:', callId);
 
-  // Meeting admin hook for logging purposes
-  const { adminId } = useMeetingAdmin(callId);
-  
-  useEffect(() => {
-    console.log('🎯 Admin ID:', adminId);
-    console.log('📊 Engagement Stats Button Visible to all users');
-  }, [adminId]);
-
   const [layout, setLayout] = useState<CallLayoutType>('speaker-left');
   const [showParticipants, setShowParticipants] = useState(false);
   const { useCallCallingState, useCameraState } = useCallStateHooks();
   const callingState = useCallCallingState();
   const { mediaStream } = useCameraState();
-  const videoRef = useRef<HTMLVideoElement>(null);
+
+  // Local video ref for capturing local frame
+  const localVideoRef = useRef<HTMLVideoElement>(null);
   const [showStats, setShowStats] = useState(false);
-  
-  // Tracking data for all participants (currently using localUser only)
+
+  // Tracking data stored by participant id.
+  // Each key holds an array of engagement entries (with timestamp, emotion, eye_state, etc.)
   const [trackingData, setTrackingData] = useState<
     Record<
       string,
@@ -63,7 +57,7 @@ const MeetingRoom = () => {
     >
   >({});
 
-  // Live preview for current FastAPI response
+  // Live preview for the latest local FastAPI response
   const [livePreview, setLivePreview] = useState<{
     emotion: string;
     eye_state: string;
@@ -71,50 +65,41 @@ const MeetingRoom = () => {
     engagement: string;
   } | null>(null);
 
-  // Attach local media stream to hidden video element
+  // Attach local media stream to off-screen local video element
   useEffect(() => {
-    if (!videoRef.current || !mediaStream) return;
+    if (!localVideoRef.current || !mediaStream) return;
     const [videoTrack] = mediaStream.getVideoTracks();
     if (videoTrack) {
-      videoRef.current.srcObject = new MediaStream([videoTrack]);
+      localVideoRef.current.srcObject = new MediaStream([videoTrack]);
     }
   }, [mediaStream]);
 
-  // Capture frame and send it to FastAPI endpoint every 15 seconds
-  const captureAndSend = async () => {
-    if (
-      !videoRef.current ||
-      !videoRef.current.videoWidth ||
-      !videoRef.current.videoHeight
-    )
+  // Capture frame from a given video element and send to FastAPI
+  const captureFrameAndSend = async (
+    videoElement: HTMLVideoElement,
+    participantId: string
+  ) => {
+    if (!videoElement || !videoElement.videoWidth || !videoElement.videoHeight) {
+      console.log(`Video dimensions not ready for participant: ${participantId}`);
       return;
-
-    const canvas = document.createElement('canvas');
-    canvas.width = videoRef.current.videoWidth || 640;
-    canvas.height = videoRef.current.videoHeight || 480;
-    const ctx = canvas.getContext('2d');
-
-    if (ctx) {
-      ctx.drawImage(videoRef.current, 0, 0, canvas.width, canvas.height);
     }
 
+    const canvas = document.createElement('canvas');
+    canvas.width = videoElement.videoWidth;
+    canvas.height = videoElement.videoHeight;
+    const ctx = canvas.getContext('2d');
+    if (ctx) {
+      ctx.drawImage(videoElement, 0, 0, canvas.width, canvas.height);
+    }
     canvas.toBlob(async (blob) => {
       if (!blob) return;
       const formData = new FormData();
       formData.append('file', blob, 'frame.jpg');
-
       try {
-        // Updated endpoint URL to match FastAPI
-        const response = await axios.post(
-          'http://127.0.0.1:8000/analyze',
-          formData
-        );
-        console.log('📡 FASTAPI RESPONSE:', response.data);
+        const response = await axios.post('http://127.0.0.1:8000/analyze', formData);
+        console.log(`📡 FASTAPI RESPONSE for ${participantId}:`, response.data);
         const { emotion, eye_state, looking_direction, engagement } = response.data;
-        
-        // Use a fixed participant ID for the local user (adjust if needed)
-        const participantId = "localUser";
-
+        // Update tracking data for this participant
         setTrackingData((prev) => ({
           ...prev,
           [participantId]: [
@@ -129,19 +114,51 @@ const MeetingRoom = () => {
           ],
         }));
 
-        // Set live preview to show on the UI
-        setLivePreview({ emotion, eye_state, looking_direction, engagement });
+        // For local participant, update live preview
+        if (participantId === 'localUser') {
+          setLivePreview({ emotion, eye_state, looking_direction, engagement });
+        }
       } catch (error) {
-        console.error('Error detecting emotion/engagement:', error);
+        console.error(`Error detecting engagement for ${participantId}:`, error);
       }
     }, 'image/jpeg');
   };
 
+  // Capture local frame from localVideoRef
+  const captureLocalFrame = async () => {
+    if (localVideoRef.current) {
+      await captureFrameAndSend(localVideoRef.current, 'localUser');
+    }
+  };
+
+  // Capture frames for remote participants by querying video elements in the DOM
+  const captureRemoteFrames = async () => {
+    // Get all video elements on the page
+    const allVideos = Array.from(document.querySelectorAll('video')) as HTMLVideoElement[];
+    // Filter out the off-screen local video element using our ref
+    const remoteVideos = allVideos.filter((video) => video !== localVideoRef.current);
+    // Optionally, further filter by visibility or specific class names if available.
+    remoteVideos.forEach((video, index) => {
+      // Try to read a data attribute for participant ID; if not available, assign one using index.
+      const participantId =
+        video.getAttribute('data-participant-id') || `remote-${index + 1}`;
+      captureFrameAndSend(video, participantId);
+    });
+  };
+
+  // Combined function to capture both local and remote frames
+  const captureAllFrames = async () => {
+    await captureLocalFrame();
+    await captureRemoteFrames();
+  };
+
+  // Set up an interval to capture frames every 15 seconds
   useEffect(() => {
-    const interval = setInterval(captureAndSend, 15000);
+    const interval = setInterval(captureAllFrames, 15000);
     return () => clearInterval(interval);
   }, []);
 
+  // If call hasn't joined yet, show loader.
   if (callingState !== CallingState.JOINED) return <Loader />;
 
   return (
@@ -165,12 +182,17 @@ const MeetingRoom = () => {
           <BarChart3 size={16} className="mr-2" /> Show Engagement Stats
         </button>
 
-        {/* Hidden video element for capturing frames */}
-        <video ref={videoRef} autoPlay muted style={{ display: 'none' }} />
+        {/* Off-screen local video element for capturing local frame */}
+        <video
+          ref={localVideoRef}
+          autoPlay
+          muted
+          style={{ position: 'absolute', top: '-10000px', left: '-10000px' }}
+        />
 
-        {/* Live Preview UI to display FastAPI response */}
+        {/* Live Preview UI to display local FastAPI analysis results */}
         {livePreview && (
-          <div className="absolute top-4 left-4 bg-white text-black p-3 rounded-xl shadow-lg backdrop-blur-sm">
+          <div className="absolute top-4 left-4 p-3 rounded-xl shadow-lg backdrop-blur-sm">
             <p>
               <strong>Emotion:</strong> {livePreview.emotion}
             </p>
@@ -187,6 +209,7 @@ const MeetingRoom = () => {
         )}
       </div>
 
+      {/* Show LiveStats overlay if enabled */}
       {showStats && (
         <LiveStats
           emotionData={Object.entries(trackingData).flatMap(([participant, data]) =>
