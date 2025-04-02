@@ -20,7 +20,7 @@ tracker = EngagementTracker()
 
 @app.get("/")
 async def root():
-    return {"message": "Welcome to the Engagement Tracker API!"}
+    return {"message": "Welcome to the Engagement Tracker API!", "status": "online"}
 
 @app.post("/analyze")
 async def analyze_image(file: UploadFile = File(...)):
