@@ -96,7 +96,7 @@ const MeetingRoom = () => {
       const formData = new FormData();
       formData.append('file', blob, 'frame.jpg');
       try {
-        const response = await axios.post('http://127.0.0.1:8000/analyze', formData);
+        const response = await axios.post('https://engagement-tracker.onrender.com/analyze', formData);
         console.log(`📡 FASTAPI RESPONSE for ${participantId}:`, response.data);
         const { emotion, eye_state, looking_direction, engagement } = response.data;
         // Update tracking data for this participant

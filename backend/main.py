@@ -3,7 +3,8 @@ from fastapi.middleware.cors import CORSMiddleware
 import numpy as np
 import cv2
 from engagement_tracker import EngagementTracker
-
+import  uvicorn
+import os
 app = FastAPI()
 
 # Enable CORS
@@ -37,5 +38,5 @@ async def analyze_image(file: UploadFile = File(...)):
     }
 
 if __name__ == "__main__":
-    import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000) 
+    port = int(os.environ.get("PORT", 8000))  # Use PORT from environment variable
+    uvicorn.run(app, host="0.0.0.0", port=port)
