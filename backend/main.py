@@ -18,6 +18,10 @@ app.add_middleware(
 # Initialize the engagement tracker
 tracker = EngagementTracker()
 
+@app.get("/")
+async def root():
+    return {"message": "Welcome to the Engagement Tracker API!"}
+
 @app.post("/analyze")
 async def analyze_image(file: UploadFile = File(...)):
     # Read image
@@ -42,4 +46,4 @@ async def health_check():
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000) 
+    uvicorn.run(app, host="0.0.0.0", port=8000)
