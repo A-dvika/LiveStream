@@ -3,7 +3,7 @@ export const detectEmotion = async (blob: Blob) => {
   formData.append('file', blob, 'frame.jpg');
 
   try {
-    const response = await fetch('http://localhost:8000/analyze', {
+    const response = await fetch('https://livestream-backend-2.onrender.com/analyze', {
       method: 'POST',
       body: formData,
     });
