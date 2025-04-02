@@ -1,0 +1,107 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+/* ======== Stream CSS Overrides ======== */
+.str-video__call-stats {
+  max-width: 500px;
+  position: relative;
+}
+
+.str-video__speaker-layout__wrapper {
+  max-height: 700px;
+}
+
+.str-video__participant-details,
+.str-video__menu-container,
+.str-video__notification {
+  color: white;
+}
+
+.str-video__participant-list {
+  background-color: #2a1a40; /* Dark lavender */
+  padding: 10px;
+  border-radius: 10px;
+  color: #f4e1ff; /* Soft lavender */
+  height: 100%;
+}
+
+.str-video__call-controls__button {
+  height: 40px;
+  background-color: #ffd700; /* Yellow for visibility */
+  color: #2a1a40;
+  border-radius: 8px;
+  font-weight: bold;
+}
+
+/* ==== Glassmorphism Effects ==== */
+.glassmorphism {
+  background: rgba(255, 255, 255, 0.2);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  border-radius: 12px;
+}
+
+.glassmorphism2 {
+  background: rgba(42, 26, 64, 0.3); /* Dark lavender tint */
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border-radius: 12px;
+}
+
+/* ==== Clerk Class Overrides ==== */
+.cl-userButtonPopoverActionButtonIcon,
+.cl-internal-wkkub3,
+.cl-userButtonPopoverActionButton {
+  color: white;
+}
+
+.cl-logoBox {
+  height: 40px;
+}
+
+.cl-dividerLine {
+  background: #524378; /* Deep lavender */
+  height: 2px;
+}
+
+.cl-socialButtonsIconButton {
+  border: 3px solid #c4aaf7; /* Light lavender */
+}
+
+/* ==== Utility Classes ==== */
+@layer utilities {
+  .flex-center {
+    @apply flex justify-center items-center;
+  }
+
+  .flex-between {
+    @apply flex justify-between items-center;
+  }
+}
+
+/* ==== Animations ==== */
+.show-block {
+  width: 100%;
+  max-width: 350px;
+  display: block;
+  animation: show 0.7s forwards linear;
+}
+
+@keyframes show {
+  0% {
+    animation-timing-function: ease-in;
+    width: 0%;
+  }
+
+  100% {
+    animation-timing-function: ease-in;
+    width: 100%;
+  }
+}
