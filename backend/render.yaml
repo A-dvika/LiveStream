@@ -16,5 +16,6 @@ services:
       - key: PATH
         value: "/usr/local/bin:/usr/bin:/bin"
     autoDeploy: true
-    healthCheckPath: /health 
+    healthCheckPath: /health
+
 
