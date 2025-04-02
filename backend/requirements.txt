@@ -7,6 +7,6 @@ uvicorn==0.27.0
 gunicorn==21.2.0
 python-multipart==0.0.6
 Pillow==10.0.0
-numpy==1.24.3
+numpy==1.21.0
 python-dotenv==1.0.0
-mediapipe-silicon==0.10.9 
+mediapipe==0.10.5
