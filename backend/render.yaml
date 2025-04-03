@@ -1,27 +1,13 @@
 services:
   - type: web
-    name: engagement-tracker
+    name: livestream-backend
     env: python
-    region: singapore
-    buildCommand: |
-      apt-get update && apt-get install -y \
-        libgl1-mesa-glx \
-        libglib2.0-0 \
-        libsm6 \
-        libxext6 \
-        libxrender-dev \
-        libpulse0 \
-        libasound2
-      pip install --no-cache-dir --upgrade pip
-      pip install --no-cache-dir -r requirements.txt
-
-    startCommand: gunicorn -w 2 -k uvicorn.workers.UvicornWorker main:app --bind 0.0.0.0:8000 
+    region: oregon
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn -w 4 -k uvicorn.workers.UvicornWorker main:app --bind 0.0.0.0:$PORT
     envVars:
       - key: PYTHON_VERSION
-        value: 3.10.12
+        value: 3.11.5
       - key: PYTHONUNBUFFERED
         value: "true"
-      - key: PATH
-        value: "/usr/local/bin:/usr/bin:/bin"
-    autoDeploy: true
-    healthCheckPath: /health
+    autoDeploy: true 
